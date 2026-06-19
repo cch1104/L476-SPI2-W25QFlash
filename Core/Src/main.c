@@ -21,12 +21,15 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "string.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+void UART_SEND(UART_HandleTypeDef *huart, char buffer[]){
+	HAL_UART_Transmit(huart, (uint8_t*) buffer, strlen(buffer), HAL_MAX_DELAY);
+}
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -99,22 +102,28 @@ int main(void)
   MX_SPI2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  //***********************Test UART for printf on Putty******************//
+  char Text2Display[]="Hello World! Nucleo-L476RG \n\r";
+  HAL_UART_Transmit(&huart2, (uint8_t*) Text2Display, strlen(Text2Display), HAL_MAX_DELAY);
+  //***********************Test UART**************************************//
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint8_t cmd = 0x9F;
-  uint8_t id[3] = {0};
+
+//  uint8_t cmd = 0x9F;
+//  uint8_t id[3] = {0};
   while(1)
   {
-	  W25Q_CS_LOW();
 
-	  HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
-	  HAL_SPI_Receive(&hspi2, id, 3, HAL_MAX_DELAY);
-
-	  W25Q_CS_HIGH();
-
+//***********************get W25Qxx ID**************************************//
+//	  W25Q_CS_LOW();
+//
+//	  HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
+//	  HAL_SPI_Receive(&hspi2, id, 3, HAL_MAX_DELAY);
+//
+//	  W25Q_CS_HIGH();
+//***********************get device ID**************************************//
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -227,7 +236,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
