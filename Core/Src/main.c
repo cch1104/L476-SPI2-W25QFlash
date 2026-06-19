@@ -105,25 +105,46 @@ int main(void)
   //***********************Test UART for printf on Putty******************//
   char Text2Display[]="Hello World! Nucleo-L476RG \n\r";
   HAL_UART_Transmit(&huart2, (uint8_t*) Text2Display, strlen(Text2Display), HAL_MAX_DELAY);
+  void UART_SEND(UART_HandleTypeDef *huart, char buffer[])
+  {
+      HAL_UART_Transmit(huart,
+                        (uint8_t*)buffer,
+                        strlen(buffer),
+                        HAL_MAX_DELAY);
+  }
+
   //***********************Test UART**************************************//
+
+  //***********************get W25Qxx ID**************************************//
+  uint8_t cmd = 0x9F;
+  uint8_t id[3] = {0};
+  W25Q_CS_LOW();
+  HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
+  HAL_SPI_Receive(&hspi2, id, 3, HAL_MAX_DELAY);
+  W25Q_CS_HIGH();
+
+  char uartBuf[64];
+
+  sprintf(uartBuf,
+		  "JEDEC ID = %02X %02X %02X\r\n",
+		  id[0],
+		  id[1],
+		  id[2]);
+
+  UART_SEND(&huart2, uartBuf);
+  //***********************get device ID**************************************//
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-//  uint8_t cmd = 0x9F;
-//  uint8_t id[3] = {0};
+
   while(1)
   {
 
-//***********************get W25Qxx ID**************************************//
-//	  W25Q_CS_LOW();
-//
-//	  HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
-//	  HAL_SPI_Receive(&hspi2, id, 3, HAL_MAX_DELAY);
-//
-//	  W25Q_CS_HIGH();
-//***********************get device ID**************************************//
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
