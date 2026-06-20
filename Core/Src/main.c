@@ -68,6 +68,74 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+//***********************Write enable function******************//
+void W25Q_WriteEnable(void)
+{
+    uint8_t cmd = 0x06;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     &cmd,
+                     1,
+                     HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+}
+//**************************************************************//
+
+//************************ReadStatus function ******************//
+uint8_t W25Q_ReadStatus(void)
+{
+    uint8_t cmd = 0x05;
+    uint8_t status = 0;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     &cmd,
+                     1,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Receive(&hspi2,
+                    &status,
+                    1,
+                    HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+
+    return status;
+}
+//**************************************************************//
+
+//************************Sector Erase function ****************//
+//************************Sector Erase-W25Q_WaitBusy function **//
+//void W25Q_WaitBusy(void)
+//{
+//    while(W25Q_ReadStatus() & 0x01);
+//}
+
+
+//void W25Q_SectorErase(uint32_t addr)
+//{
+//    uint8_t cmd[4];
+//
+//    W25Q_WriteEnable();
+//
+//    cmd[0] = 0x20;
+//    cmd[1] = (addr >> 16) & 0xFF;
+//    cmd[2] = (addr >> 8) & 0xFF;
+//    cmd[3] = addr & 0xFF;
+//
+//    W25Q_CS_LOW();
+//    HAL_SPI_Transmit(&hspi2, cmd, 4, HAL_MAX_DELAY);
+//    W25Q_CS_HIGH();
+//
+//    W25Q_WaitBusy();
+//}
+//**************************************************************//
+
+
 /* USER CODE END 0 */
 
 /**
@@ -105,13 +173,7 @@ int main(void)
   //***********************Test UART for printf on Putty******************//
   char Text2Display[]="Hello World! Nucleo-L476RG \n\r";
   HAL_UART_Transmit(&huart2, (uint8_t*) Text2Display, strlen(Text2Display), HAL_MAX_DELAY);
-  void UART_SEND(UART_HandleTypeDef *huart, char buffer[])
-  {
-      HAL_UART_Transmit(huart,
-                        (uint8_t*)buffer,
-                        strlen(buffer),
-                        HAL_MAX_DELAY);
-  }
+
 
   //***********************Test UART**************************************//
 
@@ -132,7 +194,28 @@ int main(void)
 		  id[2]);
 
   UART_SEND(&huart2, uartBuf);
-  //***********************get device ID**************************************//
+  //**************************************************************************//
+
+  //***********************Put ReadStatus function into main******************//
+  uint8_t status;
+
+  W25Q_WriteEnable();
+
+  status = W25Q_ReadStatus();
+
+  sprintf(uartBuf,
+          "Status = 0x%02X\r\n",
+          status);
+
+  UART_SEND(&huart2, uartBuf);
+  //**************************************************************************//
+
+  //***********************Put W25Q_SectorErase into main****************//
+//  W25Q_SectorErase(0x000000);
+//
+//  UART_SEND(&huart2,
+//            "Sector Erase OK\r\n");
+  //**************************************************************************//
 
 
   /* USER CODE END 2 */
