@@ -110,31 +110,89 @@ uint8_t W25Q_ReadStatus(void)
 
 //************************Sector Erase function ****************//
 //************************Sector Erase-W25Q_WaitBusy function **//
-//void W25Q_WaitBusy(void)
-//{
-//    while(W25Q_ReadStatus() & 0x01);
-//}
+void W25Q_WaitBusy(void)
+{
+    while(W25Q_ReadStatus() & 0x01);
+}
 
 
-//void W25Q_SectorErase(uint32_t addr)
-//{
-//    uint8_t cmd[4];
-//
-//    W25Q_WriteEnable();
-//
-//    cmd[0] = 0x20;
-//    cmd[1] = (addr >> 16) & 0xFF;
-//    cmd[2] = (addr >> 8) & 0xFF;
-//    cmd[3] = addr & 0xFF;
-//
-//    W25Q_CS_LOW();
-//    HAL_SPI_Transmit(&hspi2, cmd, 4, HAL_MAX_DELAY);
-//    W25Q_CS_HIGH();
-//
-//    W25Q_WaitBusy();
-//}
+void W25Q_SectorErase(uint32_t addr)
+{
+    uint8_t cmd[4];
+
+    W25Q_WriteEnable();
+
+    cmd[0] = 0x20;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+    HAL_SPI_Transmit(&hspi2, cmd, 4, HAL_MAX_DELAY);
+    W25Q_CS_HIGH();
+
+    W25Q_WaitBusy();
+}
 //**************************************************************//
 
+//***********************Read Function*****************************//
+void W25Q_Read(uint32_t addr,
+               uint8_t *buf,
+               uint16_t len)
+{
+    uint8_t cmd[4];
+
+    cmd[0] = 0x03;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     cmd,
+                     4,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Receive(&hspi2,
+                    buf,
+                    len,
+                    HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+}
+//******************************************************************//
+
+//***********************Write Function*****************************//
+void W25Q_Write(uint32_t addr,
+                uint8_t *buf,
+                uint16_t len)
+{
+    uint8_t cmd[4];
+
+    W25Q_WriteEnable();
+
+    cmd[0] = 0x02;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     cmd,
+                     4,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Transmit(&hspi2,
+                     buf,
+                     len,
+                     HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+
+    W25Q_WaitBusy();
+}
 
 /* USER CODE END 0 */
 
@@ -211,12 +269,58 @@ int main(void)
   //**************************************************************************//
 
   //***********************Put W25Q_SectorErase into main****************//
-//  W25Q_SectorErase(0x000000);
-//
-//  UART_SEND(&huart2,
-//            "Sector Erase OK\r\n");
+  W25Q_SectorErase(0x000000);
+
+  UART_SEND(&huart2,
+            "Sector Erase OK\r\n");
   //**************************************************************************//
 
+  //***********************Put Read into main********************************//
+  uint8_t data[16];
+
+  W25Q_Read(0x000000, data, 16);
+
+  for(int i=0; i<16; i++)
+  {
+      sprintf(uartBuf,"%02X ",data[i]);
+      UART_SEND(&huart2,uartBuf);
+  }
+
+  UART_SEND(&huart2,"\r\n");
+  //**************************************************************************//
+
+  //***********************Put Write and Read and check into main*************//
+  char writeData[] = "Justin";
+  char readData[16] = {0};
+
+  W25Q_Write(0x000000,
+             (uint8_t*)writeData,
+             strlen(writeData)+1);
+
+  UART_SEND(&huart2,
+            "Write OK\r\n");
+
+  W25Q_Read(0x000000,
+            (uint8_t*)readData,
+            sizeof(readData));
+
+  sprintf(uartBuf,
+          "Read = %s\r\n",
+          readData);
+
+  UART_SEND(&huart2,
+            uartBuf);
+
+  if(strcmp(writeData, readData) == 0)
+  {
+      UART_SEND(&huart2,
+                "PASS\r\n");
+  }
+  else
+  {
+      UART_SEND(&huart2,
+                "FAIL\r\n");
+  }
 
   /* USER CODE END 2 */
 
