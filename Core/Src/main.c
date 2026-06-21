@@ -21,16 +21,24 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "string.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+void UART_SEND(UART_HandleTypeDef *huart, char buffer[]){
+	HAL_UART_Transmit(huart, (uint8_t*) buffer, strlen(buffer), HAL_MAX_DELAY);
+}
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define W25Q_CS_LOW() \
+HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET)
+
+#define W25Q_CS_HIGH() \
+HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET)
 
 /* USER CODE END PD */
 
@@ -42,6 +50,8 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
 
+UART_HandleTypeDef huart2;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -50,12 +60,139 @@ SPI_HandleTypeDef hspi2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//***********************Write enable function******************//
+void W25Q_WriteEnable(void)
+{
+    uint8_t cmd = 0x06;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     &cmd,
+                     1,
+                     HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+}
+//**************************************************************//
+
+//************************ReadStatus function ******************//
+uint8_t W25Q_ReadStatus(void)
+{
+    uint8_t cmd = 0x05;
+    uint8_t status = 0;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     &cmd,
+                     1,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Receive(&hspi2,
+                    &status,
+                    1,
+                    HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+
+    return status;
+}
+//**************************************************************//
+
+//************************Sector Erase function ****************//
+//************************Sector Erase-W25Q_WaitBusy function **//
+void W25Q_WaitBusy(void)
+{
+    while(W25Q_ReadStatus() & 0x01);
+}
+
+
+void W25Q_SectorErase(uint32_t addr)
+{
+    uint8_t cmd[4];
+
+    W25Q_WriteEnable();
+
+    cmd[0] = 0x20;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+    HAL_SPI_Transmit(&hspi2, cmd, 4, HAL_MAX_DELAY);
+    W25Q_CS_HIGH();
+
+    W25Q_WaitBusy();
+}
+//**************************************************************//
+
+//***********************Read Function*****************************//
+void W25Q_Read(uint32_t addr,
+               uint8_t *buf,
+               uint16_t len)
+{
+    uint8_t cmd[4];
+
+    cmd[0] = 0x03;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     cmd,
+                     4,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Receive(&hspi2,
+                    buf,
+                    len,
+                    HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+}
+//******************************************************************//
+
+//***********************Write Function*****************************//
+void W25Q_Write(uint32_t addr,
+                uint8_t *buf,
+                uint16_t len)
+{
+    uint8_t cmd[4];
+
+    W25Q_WriteEnable();
+
+    cmd[0] = 0x02;
+    cmd[1] = (addr >> 16) & 0xFF;
+    cmd[2] = (addr >> 8) & 0xFF;
+    cmd[3] = addr & 0xFF;
+
+    W25Q_CS_LOW();
+
+    HAL_SPI_Transmit(&hspi2,
+                     cmd,
+                     4,
+                     HAL_MAX_DELAY);
+
+    HAL_SPI_Transmit(&hspi2,
+                     buf,
+                     len,
+                     HAL_MAX_DELAY);
+
+    W25Q_CS_HIGH();
+
+    W25Q_WaitBusy();
+}
 
 /* USER CODE END 0 */
 
@@ -89,14 +226,112 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  //***********************Test UART for printf on Putty******************//
+  char Text2Display[]="Hello World! Nucleo-L476RG \n\r";
+  HAL_UART_Transmit(&huart2, (uint8_t*) Text2Display, strlen(Text2Display), HAL_MAX_DELAY);
+
+
+  //***********************Test UART**************************************//
+
+  //***********************get W25Qxx ID**************************************//
+  uint8_t cmd = 0x9F;
+  uint8_t id[3] = {0};
+  W25Q_CS_LOW();
+  HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
+  HAL_SPI_Receive(&hspi2, id, 3, HAL_MAX_DELAY);
+  W25Q_CS_HIGH();
+
+  char uartBuf[64];
+
+  sprintf(uartBuf,
+		  "JEDEC ID = %02X %02X %02X\r\n",
+		  id[0],
+		  id[1],
+		  id[2]);
+
+  UART_SEND(&huart2, uartBuf);
+  //**************************************************************************//
+
+  //***********************Put ReadStatus function into main******************//
+  uint8_t status;
+
+  W25Q_WriteEnable();
+
+  status = W25Q_ReadStatus();
+
+  sprintf(uartBuf,
+          "Status = 0x%02X\r\n",
+          status);
+
+  UART_SEND(&huart2, uartBuf);
+  //**************************************************************************//
+
+  //***********************Put W25Q_SectorErase into main****************//
+  W25Q_SectorErase(0x000000);
+
+  UART_SEND(&huart2,
+            "Sector Erase OK\r\n");
+  //**************************************************************************//
+
+  //***********************Put Read into main********************************//
+  uint8_t data[16];
+
+  W25Q_Read(0x000000, data, 16);
+
+  for(int i=0; i<16; i++)
+  {
+      sprintf(uartBuf,"%02X ",data[i]);
+      UART_SEND(&huart2,uartBuf);
+  }
+
+  UART_SEND(&huart2,"\r\n");
+  //**************************************************************************//
+
+  //***********************Put Write and Read and check into main*************//
+  char writeData[] = "Justin";
+  char readData[16] = {0};
+
+  W25Q_Write(0x000000,
+             (uint8_t*)writeData,
+             strlen(writeData)+1);
+
+  UART_SEND(&huart2,
+            "Write OK\r\n");
+
+  W25Q_Read(0x000000,
+            (uint8_t*)readData,
+            sizeof(readData));
+
+  sprintf(uartBuf,
+          "Read = %s\r\n",
+          readData);
+
+  UART_SEND(&huart2,
+            uartBuf);
+
+  if(strcmp(writeData, readData) == 0)
+  {
+      UART_SEND(&huart2,
+                "PASS\r\n");
+  }
+  else
+  {
+      UART_SEND(&huart2,
+                "FAIL\r\n");
+  }
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
+
+
+  while(1)
   {
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -176,7 +411,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -190,6 +425,41 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
 
 }
 
@@ -211,22 +481,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PA5 PA7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
