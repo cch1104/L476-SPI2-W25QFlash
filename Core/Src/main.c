@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "string.h"
 #include "stdio.h"
+#include "w25qxx.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,11 +35,6 @@ void UART_SEND(UART_HandleTypeDef *huart, char buffer[]){
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define W25Q_CS_LOW() \
-HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET)
-
-#define W25Q_CS_HIGH() \
-HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET)
 
 /* USER CODE END PD */
 
@@ -67,132 +63,6 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-//***********************Write enable function******************//
-void W25Q_WriteEnable(void)
-{
-    uint8_t cmd = 0x06;
-
-    W25Q_CS_LOW();
-
-    HAL_SPI_Transmit(&hspi2,
-                     &cmd,
-                     1,
-                     HAL_MAX_DELAY);
-
-    W25Q_CS_HIGH();
-}
-//**************************************************************//
-
-//************************ReadStatus function ******************//
-uint8_t W25Q_ReadStatus(void)
-{
-    uint8_t cmd = 0x05;
-    uint8_t status = 0;
-
-    W25Q_CS_LOW();
-
-    HAL_SPI_Transmit(&hspi2,
-                     &cmd,
-                     1,
-                     HAL_MAX_DELAY);
-
-    HAL_SPI_Receive(&hspi2,
-                    &status,
-                    1,
-                    HAL_MAX_DELAY);
-
-    W25Q_CS_HIGH();
-
-    return status;
-}
-//**************************************************************//
-
-//************************Sector Erase function ****************//
-//************************Sector Erase-W25Q_WaitBusy function **//
-void W25Q_WaitBusy(void)
-{
-    while(W25Q_ReadStatus() & 0x01);
-}
-
-
-void W25Q_SectorErase(uint32_t addr)
-{
-    uint8_t cmd[4];
-
-    W25Q_WriteEnable();
-
-    cmd[0] = 0x20;
-    cmd[1] = (addr >> 16) & 0xFF;
-    cmd[2] = (addr >> 8) & 0xFF;
-    cmd[3] = addr & 0xFF;
-
-    W25Q_CS_LOW();
-    HAL_SPI_Transmit(&hspi2, cmd, 4, HAL_MAX_DELAY);
-    W25Q_CS_HIGH();
-
-    W25Q_WaitBusy();
-}
-//**************************************************************//
-
-//***********************Read Function*****************************//
-void W25Q_Read(uint32_t addr,
-               uint8_t *buf,
-               uint16_t len)
-{
-    uint8_t cmd[4];
-
-    cmd[0] = 0x03;
-    cmd[1] = (addr >> 16) & 0xFF;
-    cmd[2] = (addr >> 8) & 0xFF;
-    cmd[3] = addr & 0xFF;
-
-    W25Q_CS_LOW();
-
-    HAL_SPI_Transmit(&hspi2,
-                     cmd,
-                     4,
-                     HAL_MAX_DELAY);
-
-    HAL_SPI_Receive(&hspi2,
-                    buf,
-                    len,
-                    HAL_MAX_DELAY);
-
-    W25Q_CS_HIGH();
-}
-//******************************************************************//
-
-//***********************Write Function*****************************//
-void W25Q_Write(uint32_t addr,
-                uint8_t *buf,
-                uint16_t len)
-{
-    uint8_t cmd[4];
-
-    W25Q_WriteEnable();
-
-    cmd[0] = 0x02;
-    cmd[1] = (addr >> 16) & 0xFF;
-    cmd[2] = (addr >> 8) & 0xFF;
-    cmd[3] = addr & 0xFF;
-
-    W25Q_CS_LOW();
-
-    HAL_SPI_Transmit(&hspi2,
-                     cmd,
-                     4,
-                     HAL_MAX_DELAY);
-
-    HAL_SPI_Transmit(&hspi2,
-                     buf,
-                     len,
-                     HAL_MAX_DELAY);
-
-    W25Q_CS_HIGH();
-
-    W25Q_WaitBusy();
-}
 
 /* USER CODE END 0 */
 
@@ -231,8 +101,6 @@ int main(void)
   //***********************Test UART for printf on Putty******************//
   char Text2Display[]="Hello World! Nucleo-L476RG \n\r";
   HAL_UART_Transmit(&huart2, (uint8_t*) Text2Display, strlen(Text2Display), HAL_MAX_DELAY);
-
-
   //***********************Test UART**************************************//
 
   //***********************get W25Qxx ID**************************************//
@@ -290,7 +158,7 @@ int main(void)
   //**************************************************************************//
 
   //***********************Put Write and Read and check into main*************//
-  char writeData[] = "Justin";
+  char writeData[] = "Hello W25Qxx";
   char readData[16] = {0};
 
   W25Q_Write(0x000000,
